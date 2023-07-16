@@ -160,4 +160,4 @@ cython_debug/
 #.idea/
 
 #Ignoring all files inside Dataset to avoid large files being pushed to the repo
-Datasets/*
+*/Datasets/*
