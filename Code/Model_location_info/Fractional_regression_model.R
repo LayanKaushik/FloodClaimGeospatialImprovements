@@ -25,7 +25,7 @@ if ("__index_level_0__" %in% names(df)) {
 }
 
 # Randomly sample 10,000 rows from df to test the code
-sampled_indices <- sample(nrow(df), 20000)
+sampled_indices <- sample(nrow(df), 5000)
 
 sampled_df <- df[sampled_indices, ] #careful when using the entire dataset, use sampled_df instead of df for the code to run
 
@@ -109,7 +109,7 @@ ggplot(mae_df, aes(x = Variable, y = MAE)) +
 
 
 
-# save.image(file = paste0("fractional_regression_output_10k_rows", "-", timestamp, ".RData"))
+# save.image(file = paste0("fractional_regression_output_", "-", timestamp, ".RData"))
 
 ####Fin#####
 ################################################################################################################
