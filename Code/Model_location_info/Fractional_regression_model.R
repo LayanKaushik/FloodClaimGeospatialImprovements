@@ -24,6 +24,11 @@ if ("__index_level_0__" %in% names(df)) {
   df <- df[ , !names(df) %in% "__index_level_0__"]
 }
 
+#drop yearOfLoss
+if ("yearOfLoss" %in% names(df)) {
+  df <- df[ , !names(df) %in% "yearOfLoss"]
+}
+
 # Randomly sample 10,000 rows from df to test the code
 sampled_indices <- sample(nrow(df), 5000)
 
@@ -34,10 +39,10 @@ svd_vars = paste0("svd_", 1:30) # creates svd_1, svd_2, ..., svd_30
 df_modified = sampled_df[, !(names(sampled_df) %in% svd_vars)]
 
 # Identifying numeric variables excluding binary and the target variable
-numeric_vars = sapply(df_modified, is.numeric) & !sapply(df_modified, function(x) all(x %in% c(0, 1))) & !(names(df_modified) %in% "buildingrelativeDamage")
+# numeric_vars = sapply(df_modified, is.numeric) & !sapply(df_modified, function(x) all(x %in% c(0, 1))) & !(names(df_modified) %in% "buildingrelativeDamage")
 
 # Scaling if required
-df_modified[numeric_vars] = scale(df_modified[numeric_vars])
+# df_modified[numeric_vars] = scale(df_modified[numeric_vars])
 
 # Initialize a vector to store the MAE for baseline and each SVD variable inclusion
 mae_values <- c(Baseline = 0, setNames(numeric(length(svd_vars)), svd_vars))
