@@ -1,58 +1,41 @@
 rm(list=ls())
 set.seed(420) # for reproducibility
 
-library(lmtest)
-library(sandwich)
+# import required libraries
 library(arrow)
-library(mgcv)
 library(boot)
 library(dplyr)
-library(glmnet)
 library(ggplot2)
 
-# read this: https://m-clark.github.io/posts/2019-08-20-fractional-regression/
+# Source the utility functions, should be in the same directory as this code
+# drop_columns,scale_variables, sample_dataframe, mae_cost are in utils
+source("utils_fractional_regression.R")
+
+# read this for reference: https://m-clark.github.io/posts/2019-08-20-fractional-regression/
 
 # read dataset with encoding
 df <- read_parquet('C:/Users/Asus/Box/Flood Damage PredictionProject/Dataset/filtered_dataset_with_geo_info_with_encoding.parquet.gzip')
 
-# drop all county columns
+# drop all county, index and yearOfLoss columns
 columns_to_remove <- grep("countyCode_", names(df), value = TRUE)
-df <- df[, !(names(df) %in% columns_to_remove)]
+columns_to_drop <- c(columns_to_remove, "__index_level_0__", "yearOfLoss")
 
-# drop index column from the dataframe
-if ("__index_level_0__" %in% names(df)) {
-  df <- df[ , !names(df) %in% "__index_level_0__"]
-}
+df <- drop_columns(df, columns_to_drop)
 
-#drop yearOfLoss
-if ("yearOfLoss" %in% names(df)) {
-  df <- df[ , !names(df) %in% "yearOfLoss"]
-}
+# Scale if needed
+df <- scale_variables(df, "buildingrelativeDamage", scale = FALSE)
 
 # Randomly sample 10,000 rows from df to test the code
-sampled_indices <- sample(nrow(df), 5000)
-
-sampled_df <- df[sampled_indices, ] #careful when using the entire dataset, use sampled_df instead of df for the code to run
+sampled_df <- sample_dataframe(df, 10000, sampling_required = TRUE)
 
 # select geoinfo variables and remove them from df to create the baseline model
 svd_vars = paste0("svd_", 1:30) # creates svd_1, svd_2, ..., svd_30
-df_modified = sampled_df[, !(names(sampled_df) %in% svd_vars)]
-
-# Identifying numeric variables excluding binary and the target variable
-# numeric_vars = sapply(df_modified, is.numeric) & !sapply(df_modified, function(x) all(x %in% c(0, 1))) & !(names(df_modified) %in% "buildingrelativeDamage")
-
-# Scaling if required
-# df_modified[numeric_vars] = scale(df_modified[numeric_vars])
+df_modified = sampled_df[, !(names(sampled_df) %in% svd_vars)] #replace sampled_df with df before the final run
 
 # Initialize a vector to store the MAE for baseline and each SVD variable inclusion
 mae_values <- c(Baseline = 0, setNames(numeric(length(svd_vars)), svd_vars))
 
-# Cost function for cv.glm that calculates MAE
-mae_cost <- function(actual, predicted) {
-  mean(abs(actual - predicted))
-}
-
-#Baseline Model
+# Baseline Model
 # Perform 5 fold cross-validation with cv.glm
 baseline_model <- glm(buildingrelativeDamage ~ ., data=df_modified, family=binomial(link="probit"))
 baseline_mae <- cv.glm(df_modified, baseline_model, K=5, cost=mae_cost)
@@ -61,7 +44,6 @@ baseline_mae <- cv.glm(df_modified, baseline_model, K=5, cost=mae_cost)
 # and the second is the adjusted estimate. For MAE, you'd look at the raw (first) value.
 mae_values["Baseline"] <- baseline_mae$delta[1]
 
-#######################################################################################################
 ## check geoinfo column inclusion ##
 
 # Variable selection and iterative cross-validation
@@ -69,7 +51,10 @@ included_vars <- character() # to keep track of included SVD variables
 
 for (i in 1:length(svd_vars)) {
   mae_per_var <- setNames(numeric(length(svd_vars)), svd_vars)
-  
+
+  # Print the iteration number
+  cat("Starting iteration", i, "with", length(svd_vars), "SVD variables left.\n")
+
   for (svd_var in svd_vars[!svd_vars %in% included_vars]) {
     
     temp_df <- cbind(df_modified, sampled_df[, svd_var]) # Temporarily include the SVD variable
@@ -77,6 +62,9 @@ for (i in 1:length(svd_vars)) {
     # Perform cross-validation and calculate MAE
     cv_result <- cv.glm(temp_df, glm(buildingrelativeDamage ~ ., data=temp_df, family=binomial(link="probit")), K=2, cost=mae_cost)
     mae_per_var[svd_var] <- mean(cv_result$delta[1])
+
+    # Print the MAE for the current SVD variable
+    cat("Evaluated", svd_var, "with MAE:", mae_per_var[svd_var], "\n")
   }
   
   # Identify the SVD variable with the lowest MAE
@@ -90,10 +78,11 @@ for (i in 1:length(svd_vars)) {
   final_model_mae <- cv.glm(df_modified, glm(buildingrelativeDamage ~ ., data=df_modified, family=binomial(link="probit")), K=5, cost=mae_cost)
   mae_values[best_svd_var] <- final_model_mae$delta[1]
   
+  # Print the best SVD variable and its MAE
+  cat("Selected best SVD variable in this iteration:", best_svd_var, "with MAE:", mae_values[best_svd_var], "\n")
+  
+  # Update svd_vars for the next iteration
   svd_vars <- svd_vars[!svd_vars %in% included_vars]
-  
-  print(mae_values)
-  
 }
 
 ## Plot
@@ -102,27 +91,36 @@ for (i in 1:length(svd_vars)) {
 mae_df <- data.frame(Variable = names(mae_values), MAE = mae_values)
 
 # Plot
-ggplot(mae_df, aes(x = Variable, y = MAE)) +
+mae_plot <- ggplot(mae_df, aes(x = Variable, y = MAE)) +
   geom_line(aes(group = 1), color = "black", size = 0.5) +
-  geom_point(color = "darkgreen", size = 3) + 
+  geom_point(color = "darkgreen", size = 3) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        plot.title = element_text(hjust = 0.5)) + 
-  labs(title = "MAE Across Models with SVD Variable Inclusion",
+        plot.title = element_text(hjust = 0.5)) +
+  labs(title = "MAE Across Models with SVD Variable Inclusion (Fractional Regression)",
        x = "SVD Variable Included",
        y = "Mean Absolute Error (MAE)")
 
+# display the plot
+mae_plot
 
+# save the plot
+ggsave("MAE_SVD_Variable_Inclusion_Fractional_Regression.png", plot = mae_plot, width = 10, height = 6, dpi = 300)
 
 # save.image(file = paste0("fractional_regression_output_", "-", timestamp, ".RData"))
 
+
+
 ####Fin#####
 ################################################################################################################
-
+# some other methods if needed, remove before final submission
 
 # check here for documentation: https://www.rdocumentation.org/packages/sandwich/versions/3.1-0/topics/vcovHC
 
-# 
+# library(mgcv)
+# library(glmnet)
+# library(lmtest)
+# library(sandwich)
 # # Define a function to calculate MAE for cross-validation
 # mae_func <- function(data, indices) {
 #   
@@ -156,8 +154,6 @@ ggplot(mae_df, aes(x = Variable, y = MAE)) +
 # 
 # # Calculate average MAE across all folds
 # average_mae <- mean(mae_values)
-
-
 
 ## other ways to do fractional regression
  
