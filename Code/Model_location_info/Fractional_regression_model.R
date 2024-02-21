@@ -90,6 +90,8 @@ for (i in 1:length(svd_vars)) {
 # Convert mae_values to a data frame for ggplot
 mae_df <- data.frame(Variable = names(mae_values), MAE = mae_values)
 
+write.csv(mae_df, "C:/Users/Asus/Box/Flood Damage PredictionProject/Dataset/fraction_regression_mae_df.csv", row.names = FALSE) #save as csv
+
 # Plot
 mae_plot <- ggplot(mae_df, aes(x = Variable, y = MAE)) +
   geom_line(aes(group = 1), color = "black", size = 0.5) +
