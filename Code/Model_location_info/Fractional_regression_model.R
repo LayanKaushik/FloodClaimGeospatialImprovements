@@ -183,3 +183,33 @@ ggsave("MAE_SVD_Variable_Inclusion_Fractional_Regression.png", plot = mae_plot, 
 #   linkfrac = 'probit',
 #   intercept = FALSE  # included in model matrix
 # )
+
+#find correlation
+
+# Identify non-binary variables (more than two unique values)
+# non_binary_vars <- sapply(sampled_df, function(x) length(unique(x)) > 2)
+# 
+# # Filter the dataframe to include only non-binary variables
+# df_non_binary <- sampled_df[, non_binary_vars]
+# 
+# # Calculate the correlation matrix for the filtered dataframe
+# correlation_matrix <- cor(df_non_binary)
+# 
+# # Extract correlations with the target variable, excluding its own correlation
+# target_correlation <- correlation_matrix['buildingrelativeDamage', ]
+# target_correlation <- target_correlation[target_correlation != 1]  # Exclude self-correlation
+# 
+# # Sort the correlations in descending order
+# target_correlation <- sort(target_correlation, decreasing = TRUE)
+# 
+# # Convert to dataframe for ggplot
+# target_correlation_df <- data.frame(Variable = names(target_correlation), Correlation = target_correlation)
+# 
+# # Create the bar plot
+# ggplot(target_correlation_df, aes(x = reorder(Variable, Correlation), y = Correlation)) +
+#   geom_bar(stat = "identity") +
+#   coord_flip() +  # Flip coordinates to have variable names on y-axis
+#   theme_minimal() +  # Use a minimal theme
+#   labs(title = 'Correlation with Building Relative Damage for 10k subset of dataset',
+#        x = 'Correlation Coefficient',
+#        y = 'Variables')
