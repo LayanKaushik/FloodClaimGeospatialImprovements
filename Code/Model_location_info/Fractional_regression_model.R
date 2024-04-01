@@ -26,7 +26,7 @@ df <- drop_columns(df, columns_to_drop)
 df <- scale_variables(df, "buildingrelativeDamage", scale = FALSE)
 
 # Randomly sample 10,000 rows from df to test the code
-sampled_df <- sample_dataframe(df, 10000, sampling_required = TRUE)
+sampled_df <- sample_dataframe(df, 10000, sampling_required = FALSE)
 
 # select geoinfo variables and remove them from df to create the baseline model
 svd_vars = paste0("svd_", 1:30) # creates svd_1, svd_2, ..., svd_30
@@ -35,6 +35,7 @@ df_modified = sampled_df[, !(names(sampled_df) %in% svd_vars)] #replace sampled_
 # Initialize a vector to store the MAE for baseline and each SVD variable inclusion
 mae_values <- c(Baseline = 0, setNames(numeric(length(svd_vars)), svd_vars))
 
+Sys.time()
 # Baseline Model
 # Perform 5 fold cross-validation with cv.glm
 baseline_model <- glm(buildingrelativeDamage ~ ., data=df_modified, family=binomial(link="probit"))
@@ -43,6 +44,8 @@ baseline_mae <- cv.glm(df_modified, baseline_model, K=5, cost=mae_cost)
 # The delta contains two elements: the first is the raw cross-validation estimate of prediction error,
 # and the second is the adjusted estimate. For MAE, you'd look at the raw (first) value.
 mae_values["Baseline"] <- baseline_mae$delta[1]
+
+Sys.time()
 
 ## check geoinfo column inclusion ##
 
@@ -109,9 +112,7 @@ mae_plot
 # save the plot
 ggsave("MAE_SVD_Variable_Inclusion_Fractional_Regression.png", plot = mae_plot, width = 10, height = 6, dpi = 300)
 
-# save.image(file = paste0("fractional_regression_output_", "-", timestamp, ".RData"))
-
-
+ # save.image(file = paste0("fractional_regression_output_", "-", timestamp, ".RData"))
 
 ####Fin#####
 ################################################################################################################
